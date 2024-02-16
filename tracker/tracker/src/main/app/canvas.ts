@@ -2,6 +2,9 @@ import App from '../app/index.js'
 import { hasTag } from './guards.js'
 import Message, { CanvasNode } from './messages.gen.js'
 
+// create a dummy canvas outside to reuse over and over without affecting memory
+const resizedCanvas = document.createElement('canvas')
+
 interface CanvasSnapshot {
   images: { data: string; id: number }[]
   createdAt: number
@@ -116,8 +119,34 @@ const qualityInt = {
 }
 
 function captureSnapshot(canvas: HTMLCanvasElement, quality: 'low' | 'medium' | 'high' = 'medium') {
-  const imageFormat = 'image/jpeg' // or /png'
-  return canvas.toDataURL(imageFormat, qualityInt[quality])
+  const scale = 0.25, // 1/4 downscale
+    maxWidth = 1000, // max width of 1000 px
+    maxHeight = 1000, // max height of 1000 px
+    imageFormat = 'image/jpeg' // or /png';
+
+  // scale new size
+  let width = canvas.width * scale;
+  let height = canvas.height * scale;
+
+  // fit within max bounds
+  const scaleX = width / maxWidth;
+  const scaleY = height / maxHeight;
+  if (scaleX > 0 || scaleY > 0) {
+    // out of bound, scale down
+    const scale = Math.min(scaleX, scaleY);
+    width *= scale;
+    height *= scale;
+  }
+  
+  // resize dummy canvas to the new capture size:
+  resizedCanvas.height = canvas.width * scale;
+  resizedCanvas.width = canvas.height* scale;
+  
+  // clear and draw the new image capture to the scaled target
+  resizedContext.clearRect(canvas, 0, 0, resizedContext.width, resizedContext.height);
+  resizedContext.drawImage(canvas, 0, 0, resizedContext.width, resizedContext.height);
+  
+  return resizedCanvas.toDataURL(imageFormat, qualityInt[quality])
 }
 
 function dataUrlToBlob(dataUrl: string): [Blob, Uint8Array] | null {
